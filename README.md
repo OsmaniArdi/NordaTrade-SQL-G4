@@ -1,0 +1,1 @@
+# NordaTrade-SQL-Group-4
