@@ -1,253 +1,447 @@
 USE NordaTrade;
+GO
+
+-- =============================================================
+-- RERUN SAFE
+-- =============================================================
+DELETE FROM fact_returns;
+DELETE FROM fact_order_line_items;
+DELETE FROM fact_sales_orders;
+DELETE FROM fact_quotas;
+DELETE FROM rep_customer_assignments;
+DELETE FROM product_promotions;
+DELETE FROM dim_products;
+DELETE FROM dim_categories;
+DELETE FROM dim_customers;
+DELETE FROM dim_sales_reps;
+DELETE FROM dim_regions;
+DELETE FROM dim_date;
+
+DBCC CHECKIDENT ('fact_returns', RESEED, 0);
+DBCC CHECKIDENT ('fact_order_line_items', RESEED, 0);
+DBCC CHECKIDENT ('fact_sales_orders', RESEED, 0);
+DBCC CHECKIDENT ('fact_quotas', RESEED, 0);
+DBCC CHECKIDENT ('rep_customer_assignments', RESEED, 0);
+DBCC CHECKIDENT ('product_promotions', RESEED, 0);
+DBCC CHECKIDENT ('dim_products', RESEED, 0);
+DBCC CHECKIDENT ('dim_categories', RESEED, 0);
+DBCC CHECKIDENT ('dim_customers', RESEED, 0);
+DBCC CHECKIDENT ('dim_sales_reps', RESEED, 0);
+DBCC CHECKIDENT ('dim_regions', RESEED, 0);
+
+-- TEMP TABLES
+DROP TABLE IF EXISTS #cats;
+DROP TABLE IF EXISTS #prod_stage;
+DROP TABLE IF EXISTS #rep_stage;
+DROP TABLE IF EXISTS #cust_stage;
+DROP TABLE IF EXISTS #prod_idx;
+DROP TABLE IF EXISTS #line_stage;
+DROP TABLE IF EXISTS #promo_prods;
+
 
 -- =========================
--- DIM_DATE
+-- 1. DIM_DATE  (2022-01-01 → 2026-12-31)
 -- =========================
-INSERT INTO dim_date (date_id, year, quarter, month, month_name, week_number, day_of_week, day_name, is_business_day)
-SELECT
-    d,
-    YEAR(d),
-    DATEPART(QUARTER, d),
-    MONTH(d),
-    DATENAME(MONTH, d),
-    DATEPART(WEEK, d),
-    DATEPART(WEEKDAY, d),
-    DATENAME(WEEKDAY, d),
-    CASE WHEN DATENAME(WEEKDAY, d) IN ('Saturday','Sunday') THEN 0 ELSE 1 END
+INSERT INTO dim_date (date_id, year, quarter, month, month_name,
+                      week_number, day_of_week, day_name, is_business_day)
+SELECT d,
+       YEAR(d), DATEPART(QUARTER,d), MONTH(d), DATENAME(MONTH,d),
+       DATEPART(WEEK,d), DATEPART(WEEKDAY,d), DATENAME(WEEKDAY,d),
+       CASE WHEN DATENAME(WEEKDAY,d) IN ('Saturday','Sunday') THEN 0 ELSE 1 END
 FROM (
     SELECT TOP (365*5 + 2)
         DATEADD(DAY, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) - 1, '2022-01-01') AS d
     FROM sys.objects CROSS JOIN sys.objects s2
 ) t
 WHERE d < '2027-01-01';
+GO
 
 
 -- =========================
 -- 2. DIM_REGIONS
 -- =========================
 INSERT INTO dim_regions (country, region_name, territory) VALUES
-('Germany','Bavaria','South'), ('Germany','Hesse','Central'),
-('France','Ile-de-France','Central'), ('France','Provence','South'),
-('Austria','Vienna','East'), ('Austria','Tyrol','West'),
-('Switzerland','Zurich','North'), ('Switzerland','Geneva','West'),
-('Netherlands','North Holland','North'), ('Netherlands','South Holland','South'),
-('Germany','Saxony','East'), ('France','Normandy','North'),
-('Austria','Salzburg','Central'), ('Switzerland','Bern','Central'),
-('Netherlands','Utrecht','Central'), ('Germany','Hamburg','North'),
-('France','Brittany','West'), ('Austria','Styria','South'),
-('Switzerland','Basel','North'), ('Netherlands','Limburg','South');
+('Germany',     'Bavaria',       'South'),
+('Germany',     'Hesse',         'Central'),
+('France',      'Ile-de-France', 'Central'),
+('France',      'Provence',      'South'),
+('Austria',     'Vienna',        'East'),
+('Austria',     'Tyrol',         'West'),
+('Switzerland', 'Zurich',        'North'),
+('Switzerland', 'Geneva',        'West'),
+('Netherlands', 'North Holland', 'North'),
+('Netherlands', 'South Holland', 'South'),
+('Germany',     'Saxony',        'East'),
+('France',      'Normandy',      'North'),
+('Austria',     'Salzburg',      'Central'),
+('Switzerland', 'Bern',          'Central'),
+('Netherlands', 'Utrecht',       'Central'),
+('Germany',     'Hamburg',       'North'),
+('France',      'Brittany',      'West'),
+('Austria',     'Styria',        'South'),
+('Switzerland', 'Basel',         'North'),
+('Netherlands', 'Limburg',       'South');
+GO
 
 
 -- =========================
--- 3. DIM_CATEGORIES
+-- 3. DIM_CATEGORIES 
 -- =========================
 INSERT INTO dim_categories (category_name, parent_category_id) VALUES
-('Technology', NULL),
-('Office Supplies', NULL),
-('Industrial Equipment', NULL);
+('Technology', NULL), ('Office Supplies', NULL), ('Industrial Equipment', NULL);
 
 INSERT INTO dim_categories (category_name, parent_category_id) VALUES
-('Laptops', 1), ('Desktops', 1), ('Printers', 1), ('Accessories', 1),
-('Paper', 2), ('Writing', 2), ('Furniture', 2),
-('Tools', 3), ('Machines', 3), ('Safety', 3);
+('Laptops',1),('Desktops',1),('Printers',1),('Accessories',1),
+('Paper',2),('Writing',2),('Furniture',2),
+('Tools',3),('Machines',3),('Safety',3);
 
 INSERT INTO dim_categories (category_name, parent_category_id) VALUES
-('Gaming Laptops', 4), ('Business Laptops', 4),
-('Office Chairs', 9), ('Office Tables', 9),
-('Hand Tools', 10), ('Power Tools', 10);
+('Gaming Laptops',4),('Business Laptops',4),
+('Office Chairs',9),('Office Tables',9),
+('Hand Tools',10),('Power Tools',10);
+GO
 
 
 -- =========================
 -- 4. DIM_PRODUCTS
 -- =========================
-INSERT INTO dim_products (sku, product_name, category_id, unit_cost, list_price) VALUES
-('SKU001','Laptop Pro',1,500,1200),
-('SKU002','Laptop Max',1,600,1400),
-('SKU003','Desktop Elite',2,400,900),
-('SKU004','Printer Plus',3,100,300),
-('SKU005','Office Chair',7,80,200),
-('SKU006','Desk Table',8,120,350),
-('SKU007','Hammer Tool',9,20,60),
-('SKU008','Industrial Drill',10,300,900),
-('SKU009','USB Cable',11,5,20),
-('SKU010','External HDD',12,50,150),
-('SKU011','Router Pro',13,70,200),
-('SKU012','A4 Paper Pack',14,3,10),
-('SKU013','Pen Set',15,2,8),
-('SKU014','Cleaning Kit',16,10,40),
-('SKU015','Safety Gloves',17,8,25),
-('SKU016','Wires Bundle',18,15,50),
-('SKU017','Packaging Box',19,2,12),
-('SKU018','Mouse Plus',11,10,35),
-('SKU019','Keyboard Max',11,20,70),
-('SKU020','Monitor Pro',1,150,400);
+DECLARE @NumProducts INT = 200;
+
+SELECT category_id,
+       ROW_NUMBER() OVER (ORDER BY category_id) AS idx
+INTO #cats FROM dim_categories;
+DECLARE @CatCount INT = (SELECT COUNT(*) FROM #cats);
+
+SELECT TOP (@NumProducts)
+    ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
+INTO #prod_stage
+FROM sys.objects a CROSS JOIN sys.objects b;
+
+INSERT INTO dim_products (sku, product_name, category_id, unit_cost, list_price)
+SELECT
+    'SKU' + RIGHT('000000' + CAST(s.n AS VARCHAR(10)), 6)            AS sku,
+
+    CASE
+        WHEN s.n =  1 THEN 'Laptop Pro'
+        WHEN s.n =  2 THEN 'Laptop Max'
+        WHEN s.n =  3 THEN 'Monitor Pro'
+        WHEN s.n =  4 THEN 'Keyboard Max'
+        WHEN s.n =  5 THEN 'Mouse Plus'
+        WHEN s.n =  6 THEN 'Printer Plus'
+        WHEN s.n =  7 THEN 'Router Pro'
+        WHEN s.n =  8 THEN 'External HDD Pro'
+        WHEN s.n =  9 THEN 'USB Hub Plus'
+        WHEN s.n = 10 THEN 'Desk Chair Pro'
+        WHEN s.n = 11 THEN 'Office Table Max'
+        WHEN s.n = 12 THEN 'Drill Pro'
+        WHEN s.n = 13 THEN 'Safety Kit Plus'
+        WHEN s.n = 14 THEN 'Power Tool Max'
+        WHEN s.n = 15 THEN 'Scanner Pro'
+        ELSE 'Product ' + CAST(s.n AS VARCHAR(10))
+    END                                                              AS product_name,
+
+    c.category_id                                                    AS category_id,
+
+    uc.unit_cost                                                     AS unit_cost,
+
+    CASE
+        WHEN s.n <= 40 THEN CAST(uc.unit_cost * (3.5 + (ABS(CHECKSUM(NEWID())) % 16) * 0.1) AS DECIMAL(10,2))
+        ELSE                CAST(uc.unit_cost * (1.5 + (ABS(CHECKSUM(NEWID())) % 14) * 0.1) AS DECIMAL(10,2))
+    END                                                              AS list_price
+
+FROM #prod_stage s
+JOIN #cats c ON c.idx = ((s.n - 1) % @CatCount) + 1
+CROSS APPLY (
+    SELECT CASE
+             WHEN s.n <= 40 THEN CAST((ABS(CHECKSUM(NEWID())) % 50)  + 10  AS DECIMAL(10,2))
+             ELSE                CAST((ABS(CHECKSUM(NEWID())) % 400) + 100 AS DECIMAL(10,2))
+           END AS unit_cost
+) uc;
+
+DROP TABLE #prod_stage;
+DROP TABLE #cats;
+GO
 
 
 -- =========================
--- 5. DIM_SALES_REPS
+-- 5. DIM_SALES_REPS 
 -- =========================
-INSERT INTO dim_sales_reps (employee_code, full_name, region_id, hire_date, quota_target) VALUES
-('REP001','Rep 1',1,'2025-01-01',500000),
-('REP002','Rep 2',2,'2025-02-01',450000),
-('REP003','Rep 3',3,'2025-03-01',600000),
-('REP004','Rep 4',4,'2025-04-01',550000),
-('REP005','Rep 5',5,'2025-05-01',520000),
-('REP006','Rep 6',6,'2025-06-01',510000),
-('REP007','Rep 7',7,'2025-07-01',530000),
-('REP008','Rep 8',8,'2025-08-01',490000),
-('REP009','Rep 9',9,'2025-09-01',480000),
-('REP010','Rep 10',10,'2025-10-01',470000),
-('REP011','Rep 11',11,'2025-11-01',460000),
-('REP012','Rep 12',12,'2025-12-01',450000),
-('REP013','Rep 13',13,'2024-01-01',440000),
-('REP014','Rep 14',14,'2024-02-01',430000),
-('REP015','Rep 15',15,'2024-03-01',420000),
-('REP016','Rep 16',16,'2024-04-01',410000),
-('REP017','Rep 17',17,'2024-05-01',400000),
-('REP018','Rep 18',18,'2024-06-01',390000),
-('REP019','Rep 19',19,'2024-07-01',380000),
-('REP020','Rep 20',20,'2024-08-01',370000);
+DECLARE @NumSalesReps INT = 50;
+
+SELECT TOP (@NumSalesReps)
+    ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
+INTO #rep_stage
+FROM sys.objects a CROSS JOIN sys.objects b;
+
+INSERT INTO dim_sales_reps (employee_code, full_name, region_id, hire_date, quota_target)
+SELECT
+    'REP' + RIGHT('000000' + CAST(n AS VARCHAR(10)), 6)              AS employee_code,
+    'Representative ' + CAST(n AS VARCHAR(10))                       AS full_name,
+    (ABS(CHECKSUM(NEWID())) % 20) + 1                                AS region_id,
+    DATEADD(DAY, ABS(CHECKSUM(NEWID())) % 1095, '2022-01-01')        AS hire_date,
+    CAST(((ABS(CHECKSUM(NEWID())) % 41) + 30) * 10000 AS DECIMAL(12,2)) AS quota_target
+FROM #rep_stage;
+
+DROP TABLE #rep_stage;
+GO
 
 
 -- =========================
--- 6. DIM_CUSTOMERS
+-- 6. DIM_CUSTOMERS 
 -- =========================
-INSERT INTO dim_customers (customer_code, customer_name, region_id, credit_limit, tier) VALUES
-('C001','Customer 1',1,50000,'Gold'),
-('C002','Customer 2',3,40000,'Silver'),
-('C003','Customer 3',5,30000,'Bronze'),
-('C004','Customer 4',7,70000,'Gold'),
-('C005','Customer 5',9,45000,'Silver'),
-('C006','Customer 6',2,55000,'Gold'),
-('C007','Customer 7',4,35000,'Bronze'),
-('C008','Customer 8',6,60000,'Gold'),
-('C009','Customer 9',8,48000,'Silver'),
-('C010','Customer 10',10,32000,'Bronze'),
-('C011','Customer 11',11,51000,'Gold'),
-('C012','Customer 12',12,42000,'Silver'),
-('C013','Customer 13',13,31000,'Bronze'),
-('C014','Customer 14',14,72000,'Gold'),
-('C015','Customer 15',15,46000,'Silver'),
-('C016','Customer 16',16,53000,'Gold'),
-('C017','Customer 17',17,37000,'Bronze'),
-('C018','Customer 18',18,61000,'Gold'),
-('C019','Customer 19',19,49000,'Silver'),
-('C020','Customer 20',20,33000,'Bronze');
+DECLARE @NumCustomers INT = 500;
+
+SELECT TOP (@NumCustomers)
+    ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
+INTO #cust_stage
+FROM sys.objects a CROSS JOIN sys.objects b;
+
+INSERT INTO dim_customers (customer_code, customer_name, region_id, credit_limit, tier)
+SELECT
+    'C' + RIGHT('000000' + CAST(n AS VARCHAR(10)), 6)                AS customer_code,
+    'Customer ' + CAST(n AS VARCHAR(10))                             AS customer_name,
+
+    CASE
+        WHEN n <= 60 THEN
+            CASE (n % 4)
+                WHEN 0 THEN 1
+                WHEN 1 THEN 2
+                WHEN 2 THEN 11
+                ELSE            16
+            END
+        ELSE (ABS(CHECKSUM(NEWID())) % 20) + 1
+    END                                                              AS region_id,
+
+    CASE
+        WHEN n <= 25 THEN CAST(((ABS(CHECKSUM(NEWID())) % 5) + 6) * 10000 AS DECIMAL(12,2))
+        ELSE              CAST(((ABS(CHECKSUM(NEWID())) % 91) + 10) * 1000  AS DECIMAL(12,2))
+    END                                                              AS credit_limit,
+
+    CASE
+        WHEN n <= 25 THEN 'Gold'
+        WHEN n <= 60 THEN CASE ABS(CHECKSUM(NEWID())) % 2 WHEN 0 THEN 'Silver' ELSE 'Bronze' END
+        ELSE              CASE ABS(CHECKSUM(NEWID())) % 3
+                              WHEN 0 THEN 'Gold'
+                              WHEN 1 THEN 'Silver'
+                              ELSE        'Bronze'
+                          END
+    END                                                              AS tier
+
+FROM #cust_stage;
+
+DROP TABLE #cust_stage;
+GO
 
 
 -- =========================
--- 7. FACT_SALES_ORDERS
+-- 7. FACT_SALES_ORDERS  
 -- =========================
-INSERT INTO fact_sales_orders (customer_id, sales_rep_id, order_date, order_date_id, shipping_date, status) VALUES
-(1,1,'2024-01-01','2024-01-01','2024-01-04' ,'Completed'),
-(2,2,'2024-01-05','2024-01-05','2024-01-21','Pending'),
-(3,3,'2024-01-10','2024-01-10','2024-01-13','Completed'),
-(4,4,'2024-01-15','2024-01-15','2024-01-22','Shipped'),
-(5,5,'2024-01-20','2024-01-20','2024-01-23','Completed'),
-(6,6,'2024-01-25','2024-01-25','2024-02-10','Pending'),
-(7,7,'2024-02-01','2024-02-01','2024-02-04','Completed'),
-(8,8,'2024-02-05','2024-02-05','2024-02-12','Shipped'),
-(9,9,'2024-02-10','2024-02-10','2024-02-13','Completed'),
-(10,10,'2024-02-15','2024-02-15','2024-03-02','Pending');
+DECLARE @NumOrders    INT = 10000;
+DECLARE @OrderStart DATE = '2022-01-01';
+DECLARE @OrderEnd   DATE = CAST(GETDATE() AS DATE);
+DECLARE @SpanDays   INT  = DATEDIFF(DAY, @OrderStart, @OrderEnd) + 1;
+INSERT INTO fact_sales_orders (customer_id, sales_rep_id, order_date, order_date_id, shipping_date, status)
+SELECT
+    ((s.n - 1) % 450) + 1,
+    ((s.n - 1) % 45) + 1,
+    s.order_date,
+    s.order_date,
+    DATEADD(DAY, s.ship_lag, s.order_date),
+    s.status
+FROM (
+    SELECT TOP (@NumOrders)
+        ROW_NUMBER() OVER (ORDER BY (SELECT NULL))                    AS n,
+        DATEADD(DAY, ABS(CHECKSUM(NEWID())) % @SpanDays, @OrderStart) AS order_date,
+        CASE ABS(CHECKSUM(NEWID())) % 10
+            WHEN 0 THEN ABS(CHECKSUM(NEWID())) % 16 + 15
+            ELSE        ABS(CHECKSUM(NEWID())) % 12 + 3
+        END                                                           AS ship_lag,
+        CASE ABS(CHECKSUM(NEWID())) % 20
+            WHEN 0  THEN 'Pending'
+            WHEN 1  THEN 'Pending'
+            WHEN 2  THEN 'Pending'
+            WHEN 3  THEN 'Shipped'
+            WHEN 4  THEN 'Shipped'
+            WHEN 5  THEN 'Shipped'
+            WHEN 6  THEN 'Partially Delivered'
+            WHEN 7  THEN 'Partially Delivered'
+            WHEN 8  THEN 'Delivered'
+            WHEN 9  THEN 'Delivered'
+            WHEN 10 THEN 'Delivered'
+            WHEN 11 THEN 'Delivered'
+            ELSE         'Completed'
+        END                                                           AS status
+    FROM sys.objects a CROSS JOIN sys.objects b CROSS JOIN sys.objects c
+) s;
+GO
 
 
 -- =========================
 -- 8. FACT_ORDER_LINE_ITEMS
 -- =========================
-INSERT INTO fact_order_line_items (order_id, product_id, quantity, unit_price, discount) VALUES
-(1,1,2,1200,0.1),(2,2,1,1400,0.05),(3,3,3,900,0),
-(4,4,2,300,0.1),(5,5,5,200,0.05),(6,6,1,350,0),
-(7,7,4,60,0.1),(8,8,2,900,0.15),(9,9,10,20,0),
-(10,10,3,150,0.05);
+
+SELECT product_id, list_price,
+       ROW_NUMBER() OVER (ORDER BY product_id) AS idx
+INTO #prod_idx FROM dim_products;
+DECLARE @ProdCount INT = (SELECT COUNT(*) FROM #prod_idx);
+DECLARE @NoSaleCount INT = 5;
+DECLARE @ActiveProdCount INT = @ProdCount - @NoSaleCount;
+
+SELECT
+    order_id,
+    ROW_NUMBER() OVER (ORDER BY order_id)     AS rn,
+    (ABS(CHECKSUM(NEWID())) % 10) + 1         AS quantity,
+    CASE ABS(CHECKSUM(NEWID())) % 4
+        WHEN 0 THEN CAST(0.00 AS DECIMAL(5,2))
+        WHEN 1 THEN CAST(0.05 AS DECIMAL(5,2))
+        WHEN 2 THEN CAST(0.10 AS DECIMAL(5,2))
+        ELSE        CAST(0.15 AS DECIMAL(5,2))
+    END                                       AS discount
+INTO #line_stage
+FROM fact_sales_orders;
+
+INSERT INTO fact_order_line_items (order_id, product_id, quantity, unit_price, discount)
+SELECT
+    ls.order_id,
+    pi.product_id,
+    ls.quantity,
+    pi.list_price,
+    ls.discount
+FROM #line_stage ls
+JOIN #prod_idx pi ON pi.idx = ((ls.rn - 1) % @ActiveProdCount) + 1;
+
+INSERT INTO fact_order_line_items (order_id, product_id, quantity, unit_price, discount)
+SELECT
+    ls.order_id,
+    pi.product_id,
+    (ABS(CHECKSUM(NEWID())) % 5) + 1,
+    pi.list_price,
+    CAST(0.00 AS DECIMAL(5,2))
+FROM #line_stage ls
+JOIN #prod_idx pi ON pi.idx = ((ls.rn) % @ActiveProdCount) + 1
+WHERE ABS(CHECKSUM(NEWID())) % 10 < 3;
+
+UPDATE li
+SET li.quantity = 1,
+    li.unit_price = CASE WHEN li.unit_price > 200 THEN 200 ELSE li.unit_price END
+FROM fact_order_line_items li
+JOIN fact_sales_orders o ON o.order_id = li.order_id
+WHERE o.customer_id <= 40;
+
+DROP TABLE #line_stage;
+DROP TABLE #prod_idx;
+GO
 
 
 -- =========================
 -- 9. FACT_QUOTAS
 -- =========================
-INSERT INTO fact_quotas (sales_rep_id, period_start, period_end, period_start_id, period_end_id, quota_amount) VALUES
-(1,'2024-01-01','2024-03-31','2024-01-01','2024-03-31',150000),
-(2,'2024-01-01','2024-03-31','2024-01-01','2024-03-31',140000),
-(3,'2024-01-01','2024-03-31','2024-01-01','2024-03-31',160000);
+INSERT INTO fact_quotas (sales_rep_id, period_start, period_end,
+                         period_start_id, period_end_id, quota_amount)
+SELECT
+    r.sales_rep_id,
+    q.ps, q.pe, q.ps, q.pe,
+    CAST(((ABS(CHECKSUM(NEWID())) % 13) + 8) * 10000 AS DECIMAL(12,2))
+FROM dim_sales_reps r
+CROSS JOIN (VALUES
+    (CAST('2022-01-01' AS DATE), CAST('2022-03-31' AS DATE)),
+    (CAST('2022-04-01' AS DATE), CAST('2022-06-30' AS DATE)),
+    (CAST('2022-07-01' AS DATE), CAST('2022-09-30' AS DATE)),
+    (CAST('2022-10-01' AS DATE), CAST('2022-12-31' AS DATE)),
+    (CAST('2023-01-01' AS DATE), CAST('2023-03-31' AS DATE)),
+    (CAST('2023-04-01' AS DATE), CAST('2023-06-30' AS DATE)),
+    (CAST('2023-07-01' AS DATE), CAST('2023-09-30' AS DATE)),
+    (CAST('2023-10-01' AS DATE), CAST('2023-12-31' AS DATE)),
+    (CAST('2024-01-01' AS DATE), CAST('2024-03-31' AS DATE)),
+    (CAST('2024-04-01' AS DATE), CAST('2024-06-30' AS DATE)),
+    (CAST('2024-07-01' AS DATE), CAST('2024-09-30' AS DATE)),
+    (CAST('2024-10-01' AS DATE), CAST('2024-12-31' AS DATE))
+) q (ps, pe);
+GO
 
 
 -- =========================
 -- 10. REP-CUSTOMER ASSIGNMENTS
 -- =========================
-INSERT INTO rep_customer_assignments (sales_rep_id, customer_id, start_date) VALUES
-(1,1,'2024-01-01'),(2,2,'2024-01-01'),
-(3,3,'2024-01-01'),(4,4,'2024-01-01'),
-(5,5,'2024-01-01'),(6,6,'2024-01-01'),
-(7,7,'2024-01-01'),(8,8,'2024-01-01'),
-(9,9,'2024-01-01'),(10,10,'2024-01-01');
+INSERT INTO rep_customer_assignments (sales_rep_id, customer_id, start_date)
+SELECT r.sales_rep_id, c.customer_id, '2022-01-01'
+FROM dim_sales_reps r
+JOIN dim_customers  c
+  ON (c.customer_id % 45) = ((r.sales_rep_id - 1) % 45)
+WHERE r.sales_rep_id <= (SELECT MIN(sales_rep_id) + 44 FROM dim_sales_reps);
+GO
 
 
 -- =========================
 -- 11. PRODUCT_PROMOTIONS
 -- =========================
-INSERT INTO product_promotions (product_id, promotion_name, discount_rate, start_date, end_date, start_date_id, end_date_id) VALUES
-(1, 'New Year Sale', 0.15, '2024-01-01', '2024-01-31', '2024-01-01', '2024-01-31'),
-(2, 'Winter Discount', 0.10, '2024-01-05', '2024-02-05', '2024-01-05', '2024-02-05'),
-(5, 'Office Essentials Promo', 0.20, '2024-02-01', '2024-02-28', '2024-02-01', '2024-02-28'),
-(8, 'Industrial Equipment Sale', 0.25, '2024-03-01', '2024-03-31', '2024-03-01', '2024-03-31'),
-(10, 'Storage Offer', 0.15, '2024-03-15', '2024-04-15', '2024-03-15', '2024-04-15');
+SELECT TOP 7 product_id,
+       ROW_NUMBER() OVER (ORDER BY product_id) AS rn
+INTO #promo_prods FROM dim_products ORDER BY product_id;
+
+INSERT INTO product_promotions (product_id, promotion_name, discount_rate,
+                                start_date, end_date, start_date_id, end_date_id)
+SELECT pp.product_id, pd.pname, pd.drate, pd.sd, pd.ed, pd.sd, pd.ed
+FROM (VALUES
+    (1,'New Year Sale',       CAST(0.15 AS DECIMAL(5,2)),CAST('2022-01-01' AS DATE),CAST('2022-01-31' AS DATE)),
+    (2,'Summer Promo',        CAST(0.10 AS DECIMAL(5,2)),CAST('2022-06-01' AS DATE),CAST('2022-06-30' AS DATE)),
+    (3,'Black Friday Deal',   CAST(0.20 AS DECIMAL(5,2)),CAST('2022-11-25' AS DATE),CAST('2022-11-30' AS DATE)),
+    (4,'Industrial Sale',     CAST(0.25 AS DECIMAL(5,2)),CAST('2023-03-01' AS DATE),CAST('2023-03-31' AS DATE)),
+    (5,'Year-End Clearance',  CAST(0.15 AS DECIMAL(5,2)),CAST('2023-12-15' AS DATE),CAST('2023-12-31' AS DATE)),
+    (6,'Spring Office Promo', CAST(0.10 AS DECIMAL(5,2)),CAST('2024-03-01' AS DATE),CAST('2024-03-31' AS DATE)),
+    (7,'Storage Offer',       CAST(0.15 AS DECIMAL(5,2)),CAST('2024-06-01' AS DATE),CAST('2024-06-30' AS DATE))
+) pd (rn, pname, drate, sd, ed)
+JOIN #promo_prods pp ON pp.rn = pd.rn;
+
+DROP TABLE #promo_prods;
+GO
 
 
+-- =========================
+-- 12. FACT_RETURNS
+-- =========================
+INSERT INTO fact_returns (line_item_id, return_date, return_date_id,
+                          quantity, return_amount, reason)
+SELECT
+    li.line_item_id,
+    DATEADD(DAY, ABS(CHECKSUM(NEWID())) % 14 + 5, o.order_date),
+    DATEADD(DAY, ABS(CHECKSUM(NEWID())) % 14 + 5, o.order_date),
+    1,
+    CAST(li.unit_price * (1 - li.discount) AS DECIMAL(12,2)),
+    CASE ABS(CHECKSUM(NEWID())) % 3
+        WHEN 0 THEN 'Damaged'
+        WHEN 1 THEN 'Wrong Item'
+        ELSE        'Customer Dissatisfied'
+    END
+FROM fact_order_line_items li
+JOIN fact_sales_orders o ON li.order_id = o.order_id
+WHERE ABS(CHECKSUM(NEWID())) % 8 = 0;
+GO
 
--- ===========================
--- 12. Pro
--- ===========================
-
-
-
-
-
-INSERT INTO fact_returns 
-(line_item_id, return_date, return_date_id, quantity, return_amount, reason)
-VALUES
-(4, '2024-01-20', '2024-01-20', 1, 180.00, 'Wrong Item'),
-(8, '2024-02-10', '2024-02-10', 1, 540.00, 'Customer Dissatisfied'),
-(1, '2024-01-06', '2024-01-06', 1, 720.00, 'Damaged'),
-(2, '2024-01-10', '2024-01-10', 1, 420.00, 'Wrong Item'),
-(3, '2024-01-15', '2024-01-15', 1, 810.00, 'Damaged'),
-(4, '2024-01-20', '2024-01-20', 1, 180.00, 'Customer Dissatisfied'),
-(5, '2024-01-25', '2024-01-25', 1, 300.00, 'Damaged'),
-(6, '2024-01-30', '2024-01-30', 1, 105.00, 'Customer Dissatisfied'),
-(7, '2024-02-06', '2024-02-06', 1, 72.00, 'Customer Dissatisfied'),
-(8, '2024-02-10', '2024-02-10', 1, 540.00, 'Damaged'),
-(9, '2024-02-15', '2024-02-15', 3, 60.00, 'Customer Dissatisfied'),
-(10, '2024-02-20', '2024-02-20', 1, 135.00, 'Customer Dissatisfied'),
-(4, '2024-01-20', '2024-01-20', 1, 180.00, 'Wrong Item'),
-(8, '2024-02-10', '2024-02-10', 1, 540.00, 'Customer Dissatisfied'),
-(1, '2024-01-06', '2024-01-06', 1, 720.00, 'Customer Dissatisfied'),
-(2, '2024-01-10', '2024-01-10', 1, 420.00, 'Customer Dissatisfied'),
-(3, '2024-01-15', '2024-01-15', 1, 810.00, 'Damaged'),
-(4, '2024-01-20', '2024-01-20', 1, 180.00, 'Damaged'),
-(5, '2024-01-25', '2024-01-25', 1, 300.00, 'Damaged'),
-(6, '2024-01-30', '2024-01-30', 1, 105.00, 'Damaged'),
-(7, '2024-02-06', '2024-02-06', 1, 72.00, 'Damaged'),
-(8, '2024-02-10', '2024-02-10', 1, 540.00, 'Damaged'),
-(9, '2024-02-15', '2024-02-15', 3, 60.00, 'Damaged'),
-(10, '2024-02-20', '2024-02-20', 1, 135.00, 'Damaged'),
-(1, '2024-01-06', '2024-01-06', 1, 720.00, 'Customer Dissatisfied'),
-(2, '2024-01-10', '2024-01-10', 1, 420.00, 'Wrong Item'),
-(3, '2024-01-15', '2024-01-15', 1, 810.00, 'Customer Dissatisfied'),
-(4, '2024-01-20', '2024-01-20', 1, 180.00, 'Customer Dissatisfied'),
-(5, '2024-01-25', '2024-01-25', 1, 300.00, 'Damaged'),
-(6, '2024-01-30', '2024-01-30', 1, 105.00, 'Wrong Item'),
-(7, '2024-02-06', '2024-02-06', 1, 72.00, 'Wrong Item'),
-(8, '2024-02-10', '2024-02-10', 1, 540.00, 'Customer Dissatisfied'),
-(9, '2024-02-15', '2024-02-15', 3, 60.00, 'Customer Dissatisfied'),
-(10, '2024-02-20', '2024-02-20', 1, 135.00, 'Damaged'),
-(1, '2024-01-06', '2024-01-06', 1, 720.00, 'Wrong Item'),
-(2, '2024-01-10', '2024-01-10', 1, 420.00, 'Wrong Item'),
-(3, '2024-01-15', '2024-01-15', 1, 810.00, 'Damaged'),
-(4, '2024-01-20', '2024-01-20', 1, 180.00, 'Customer Dissatisfied'),
-(5, '2024-01-25', '2024-01-25', 1, 300.00, 'Damaged'),
-(6, '2024-01-30', '2024-01-30', 1, 105.00, 'Customer Dissatisfied'),
-(7, '2024-02-06', '2024-02-06', 1, 72.00, 'Damaged'),
-(8, '2024-02-10', '2024-02-10', 1, 540.00, 'Wrong Item'),
-(9, '2024-02-15', '2024-02-15', 3, 60.00, 'Damaged'),
-(10, '2024-02-20', '2024-02-20', 1, 135.00, 'Customer Dissatisfied'),
-(1, '2024-01-06', '2024-01-06', 1, 720.00, 'Damaged'),
-(2, '2024-01-10', '2024-01-10', 1, 420.00, 'Damaged'),
-(3, '2024-01-15', '2024-01-15', 1, 810.00, 'Damaged');
+;WITH li_by_cat AS (
+    SELECT 
+        li.line_item_id,
+        o.order_date,
+        p.category_id,
+        ROW_NUMBER() OVER (PARTITION BY p.category_id ORDER BY NEWID()) AS rn
+    FROM fact_order_line_items li
+    JOIN fact_sales_orders o ON li.order_id = o.order_id
+    JOIN dim_products p ON li.product_id = p.product_id
+)
+INSERT INTO fact_returns (line_item_id, return_date, return_date_id,
+                          quantity, return_amount, reason)
+SELECT
+    l.line_item_id,
+    DATEADD(DAY, 7, l.order_date),
+    DATEADD(DAY, 7, l.order_date),
+    1,
+    CAST(li.unit_price * (1 - li.discount) AS DECIMAL(12,2)),
+    'Category Sample'
+FROM li_by_cat l
+JOIN fact_order_line_items li ON li.line_item_id = l.line_item_id
+WHERE l.rn = 1
+  AND NOT EXISTS (
+        SELECT 1 
+        FROM fact_returns r 
+        WHERE r.line_item_id = l.line_item_id
+  );
