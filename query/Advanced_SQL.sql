@@ -14,10 +14,6 @@ WITH customer_orders AS (
     FROM dim_customers c
     LEFT JOIN fact_sales_orders o 
         ON c.customer_id = o.customer_id
-        AND o.order_date >= (
-            SELECT DATEADD(YEAR, -1, MAX(order_date))
-            FROM fact_sales_orders
-        )
     LEFT JOIN fact_order_line_items li 
         ON o.order_id = li.order_id
     GROUP BY c.customer_id, c.customer_name
@@ -54,12 +50,12 @@ scored AS (
 )
 SELECT *,
     CASE 
-        WHEN r_score >=4 AND f_score >=4 THEN 'Champions'
-        WHEN f_score >=4 THEN 'Loyal'
-        WHEN r_score <=2 AND f_score >=3 THEN 'At Risk'
-        WHEN r_score =1 THEN 'Lost'
-        ELSE 'New'
-    END AS segment
+		WHEN r_score >=4 AND f_score >=4 THEN 'Champions' 
+		WHEN f_score >=4 THEN 'Loyal' 
+		WHEN r_score <=2 AND f_score >=3 THEN 'At Risk' 
+		WHEN r_score =1 THEN 'Lost' 
+		ELSE 'New' 
+	END AS segment
 FROM scored;
 
 -- ------------------------------------------------------
@@ -81,7 +77,7 @@ WITH monthly_revenue AS (
 SELECT *,
     LAG(revenue) OVER (PARTITION BY country ORDER BY year, month) AS prev_revenue,
     revenue - LAG(revenue) OVER (PARTITION BY country ORDER BY year, month) AS change,
-    (revenue - LAG(revenue) OVER (PARTITION BY country ORDER BY year, month)) * 1.0
+    (revenue - LAG(revenue) OVER (PARTITION BY country ORDER BY year, month)) 
         / LAG(revenue) OVER (PARTITION BY country ORDER BY year, month) AS pct_change
 FROM monthly_revenue;
 
@@ -109,7 +105,16 @@ GROUP BY r.region_name, d.year, d.quarter, o.order_id, o.order_date;
 -- -----------------------------------------------
 -- Rank Sales Reps Within Region
 -- -----------------------------------------------
-WITH rep_sales AS (
+WITH last_quarter AS (
+    SELECT TOP 1
+        d.year,
+        d.quarter
+    FROM dim_date d
+    WHERE d.date_id < GETDATE()
+    GROUP BY d.year, d.quarter
+    ORDER BY d.year DESC, d.quarter DESC
+),
+rep_sales AS (
     SELECT 
         sr.sales_rep_id,
         sr.full_name,
@@ -119,8 +124,11 @@ WITH rep_sales AS (
     FROM dim_sales_reps sr
     JOIN dim_regions r ON sr.region_id = r.region_id
     LEFT JOIN fact_sales_orders o ON sr.sales_rep_id = o.sales_rep_id
+    LEFT JOIN dim_date d ON o.order_date = d.date_id
     LEFT JOIN fact_order_line_items li ON o.order_id = li.order_id
     LEFT JOIN fact_quotas q ON sr.sales_rep_id = q.sales_rep_id
+    JOIN last_quarter lq 
+        ON d.year = lq.year AND d.quarter = lq.quarter
     GROUP BY sr.sales_rep_id, sr.full_name, r.region_name
 ),
 calc AS (
