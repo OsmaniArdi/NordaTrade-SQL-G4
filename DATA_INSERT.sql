@@ -11,11 +11,8 @@ DELETE FROM fact_quotas;
 DELETE FROM rep_customer_assignments;
 DELETE FROM product_promotions;
 DELETE FROM dim_products;
-DELETE FROM dim_categories;
 DELETE FROM dim_customers;
 DELETE FROM dim_sales_reps;
-DELETE FROM dim_regions;
-DELETE FROM dim_date;
 
 DBCC CHECKIDENT ('fact_returns', RESEED, 0);
 DBCC CHECKIDENT ('fact_order_line_items', RESEED, 0);
@@ -24,16 +21,16 @@ DBCC CHECKIDENT ('fact_quotas', RESEED, 0);
 DBCC CHECKIDENT ('rep_customer_assignments', RESEED, 0);
 DBCC CHECKIDENT ('product_promotions', RESEED, 0);
 DBCC CHECKIDENT ('dim_products', RESEED, 0);
-DBCC CHECKIDENT ('dim_categories', RESEED, 0);
 DBCC CHECKIDENT ('dim_customers', RESEED, 0);
 DBCC CHECKIDENT ('dim_sales_reps', RESEED, 0);
-DBCC CHECKIDENT ('dim_regions', RESEED, 0);
 
 -- TEMP TABLES
 DROP TABLE IF EXISTS #cats;
 DROP TABLE IF EXISTS #prod_stage;
 DROP TABLE IF EXISTS #rep_stage;
 DROP TABLE IF EXISTS #cust_stage;
+DROP TABLE IF EXISTS #cust_idx;
+DROP TABLE IF EXISTS #rep_idx;
 DROP TABLE IF EXISTS #prod_idx;
 DROP TABLE IF EXISTS #line_stage;
 DROP TABLE IF EXISTS #promo_prods;
@@ -42,63 +39,84 @@ DROP TABLE IF EXISTS #promo_prods;
 -- =========================
 -- 1. DIM_DATE  (2022-01-01 → 2026-12-31)
 -- =========================
-INSERT INTO dim_date (date_id, year, quarter, month, month_name,
-                      week_number, day_of_week, day_name, is_business_day)
-SELECT d,
-       YEAR(d), DATEPART(QUARTER,d), MONTH(d), DATENAME(MONTH,d),
-       DATEPART(WEEK,d), DATEPART(WEEKDAY,d), DATENAME(WEEKDAY,d),
-       CASE WHEN DATENAME(WEEKDAY,d) IN ('Saturday','Sunday') THEN 0 ELSE 1 END
-FROM (
-    SELECT TOP (365*5 + 2)
-        DATEADD(DAY, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) - 1, '2022-01-01') AS d
-    FROM sys.objects CROSS JOIN sys.objects s2
-) t
-WHERE d < '2027-01-01';
+IF NOT EXISTS (SELECT 1 FROM dim_date)
+BEGIN
+    INSERT INTO dim_date (date_id, year, quarter, month, month_name,
+                          week_number, day_of_week, day_name, is_business_day)
+    SELECT d,
+           YEAR(d), DATEPART(QUARTER,d), MONTH(d), DATENAME(MONTH,d),
+           DATEPART(WEEK,d), DATEPART(WEEKDAY,d), DATENAME(WEEKDAY,d),
+           CASE WHEN DATENAME(WEEKDAY,d) IN ('Saturday','Sunday') THEN 0 ELSE 1 END
+    FROM (
+        SELECT TOP (365*5 + 2)
+            DATEADD(DAY, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) - 1, '2022-01-01') AS d
+        FROM sys.objects CROSS JOIN sys.objects s2
+    ) t
+    WHERE d < '2027-01-01';
+END
 GO
 
 
 -- =========================
 -- 2. DIM_REGIONS
 -- =========================
-INSERT INTO dim_regions (country, region_name, territory) VALUES
-('Germany',     'Bavaria',       'South'),
-('Germany',     'Hesse',         'Central'),
-('France',      'Ile-de-France', 'Central'),
-('France',      'Provence',      'South'),
-('Austria',     'Vienna',        'East'),
-('Austria',     'Tyrol',         'West'),
-('Switzerland', 'Zurich',        'North'),
-('Switzerland', 'Geneva',        'West'),
-('Netherlands', 'North Holland', 'North'),
-('Netherlands', 'South Holland', 'South'),
-('Germany',     'Saxony',        'East'),
-('France',      'Normandy',      'North'),
-('Austria',     'Salzburg',      'Central'),
-('Switzerland', 'Bern',          'Central'),
-('Netherlands', 'Utrecht',       'Central'),
-('Germany',     'Hamburg',       'North'),
-('France',      'Brittany',      'West'),
-('Austria',     'Styria',        'South'),
-('Switzerland', 'Basel',         'North'),
-('Netherlands', 'Limburg',       'South');
+IF NOT EXISTS (SELECT 1 FROM dim_regions)
+BEGIN
+    SET IDENTITY_INSERT dim_regions ON;
+    INSERT INTO dim_regions (region_id, country, region_name, territory) VALUES
+    (1,  'Germany',     'Bavaria',       'South'),
+    (2,  'Germany',     'Hesse',         'Central'),
+    (3,  'France',      'Ile-de-France', 'Central'),
+    (4,  'France',      'Provence',      'South'),
+    (5,  'Austria',     'Vienna',        'East'),
+    (6,  'Austria',     'Tyrol',         'West'),
+    (7,  'Switzerland', 'Zurich',        'North'),
+    (8,  'Switzerland', 'Geneva',        'West'),
+    (9,  'Netherlands', 'North Holland', 'North'),
+    (10, 'Netherlands', 'South Holland', 'South'),
+    (11, 'Germany',     'Saxony',        'East'),
+    (12, 'France',      'Normandy',      'North'),
+    (13, 'Austria',     'Salzburg',      'Central'),
+    (14, 'Switzerland', 'Bern',          'Central'),
+    (15, 'Netherlands', 'Utrecht',       'Central'),
+    (16, 'Germany',     'Hamburg',       'North'),
+    (17, 'France',      'Brittany',      'West'),
+    (18, 'Austria',     'Styria',        'South'),
+    (19, 'Switzerland', 'Basel',         'North'),
+    (20, 'Netherlands', 'Limburg',       'South');
+    SET IDENTITY_INSERT dim_regions OFF;
+END
 GO
 
 
 -- =========================
 -- 3. DIM_CATEGORIES 
 -- =========================
-INSERT INTO dim_categories (category_name, parent_category_id) VALUES
-('Technology', NULL), ('Office Supplies', NULL), ('Industrial Equipment', NULL);
-
-INSERT INTO dim_categories (category_name, parent_category_id) VALUES
-('Laptops',1),('Desktops',1),('Printers',1),('Accessories',1),
-('Paper',2),('Writing',2),('Furniture',2),
-('Tools',3),('Machines',3),('Safety',3);
-
-INSERT INTO dim_categories (category_name, parent_category_id) VALUES
-('Gaming Laptops',4),('Business Laptops',4),
-('Office Chairs',9),('Office Tables',9),
-('Hand Tools',10),('Power Tools',10);
+IF NOT EXISTS (SELECT 1 FROM dim_categories)
+BEGIN
+    SET IDENTITY_INSERT dim_categories ON;
+    INSERT INTO dim_categories (category_id, category_name, parent_category_id) VALUES
+    (1,  'Technology', NULL),
+    (2,  'Office Supplies', NULL),
+    (3,  'Industrial Equipment', NULL),
+    (4,  'Laptops', 1),
+    (5,  'Desktops', 1),
+    (6,  'Printers', 1),
+    (7,  'Accessories', 1),
+    (8,  'Paper', 2),
+    (9,  'Writing', 2),
+    (10, 'Furniture', 2),
+    (11, 'Tools', 3),
+    (12, 'Machines', 3),
+    (13, 'Safety', 3),
+    (14, 'Gaming Laptops', 4),
+    (15, 'Business Laptops', 4),
+    (16, 'Office Chairs', 9),
+    (17, 'Office Tables', 9),
+    (18, 'Hand Tools', 10),
+    (19, 'Power Tools', 10);
+    SET IDENTITY_INSERT dim_categories OFF;
+END
 GO
 
 
@@ -177,10 +195,15 @@ INSERT INTO dim_sales_reps (employee_code, full_name, region_id, hire_date, quot
 SELECT
     'REP' + RIGHT('000000' + CAST(n AS VARCHAR(10)), 6)              AS employee_code,
     'Representative ' + CAST(n AS VARCHAR(10))                       AS full_name,
-    (ABS(CHECKSUM(NEWID())) % 20) + 1                                AS region_id,
+    r.region_id                                                      AS region_id,
     DATEADD(DAY, ABS(CHECKSUM(NEWID())) % 1095, '2022-01-01')        AS hire_date,
     CAST(((ABS(CHECKSUM(NEWID())) % 41) + 30) * 10000 AS DECIMAL(12,2)) AS quota_target
-FROM #rep_stage;
+FROM #rep_stage
+CROSS APPLY (
+    SELECT TOP 1 region_id
+    FROM dim_regions
+    ORDER BY NEWID()
+) r;
 
 DROP TABLE #rep_stage;
 GO
@@ -204,12 +227,12 @@ SELECT
     CASE
         WHEN n <= 60 THEN
             CASE (n % 4)
-                WHEN 0 THEN 1
-                WHEN 1 THEN 2
-                WHEN 2 THEN 11
-                ELSE            16
+                WHEN 0 THEN gr.g_region_1
+                WHEN 1 THEN gr.g_region_2
+                WHEN 2 THEN gr.g_region_3
+                ELSE            gr.g_region_4
             END
-        ELSE (ABS(CHECKSUM(NEWID())) % 20) + 1
+        ELSE ar.region_id
     END                                                              AS region_id,
 
     CASE
@@ -227,7 +250,24 @@ SELECT
                           END
     END                                                              AS tier
 
-FROM #cust_stage;
+FROM #cust_stage
+CROSS APPLY (
+    SELECT
+        MIN(CASE WHEN rn = 1 THEN region_id END) AS g_region_1,
+        MIN(CASE WHEN rn = 2 THEN region_id END) AS g_region_2,
+        MIN(CASE WHEN rn = 3 THEN region_id END) AS g_region_3,
+        MIN(CASE WHEN rn = 4 THEN region_id END) AS g_region_4
+    FROM (
+        SELECT region_id, ROW_NUMBER() OVER (ORDER BY region_id) AS rn
+        FROM dim_regions
+        WHERE country = 'Germany'
+    ) g
+) gr
+CROSS APPLY (
+    SELECT TOP 1 region_id
+    FROM dim_regions
+    ORDER BY NEWID()
+) ar;
 
 DROP TABLE #cust_stage;
 GO
@@ -236,14 +276,36 @@ GO
 -- =========================
 -- 7. FACT_SALES_ORDERS  
 -- =========================
-DECLARE @NumOrders    INT = 10000;
+DECLARE @NumOrders    INT = 1000;
 DECLARE @OrderStart DATE = '2022-01-01';
 DECLARE @OrderEnd   DATE = CAST(GETDATE() AS DATE);
 DECLARE @SpanDays   INT  = DATEDIFF(DAY, @OrderStart, @OrderEnd) + 1;
+
+SELECT customer_id,
+       ROW_NUMBER() OVER (ORDER BY customer_id) AS idx
+INTO #cust_idx
+FROM (
+    SELECT TOP 450 customer_id
+    FROM dim_customers
+    ORDER BY customer_id
+) c;
+
+SELECT sales_rep_id,
+       ROW_NUMBER() OVER (ORDER BY sales_rep_id) AS idx
+INTO #rep_idx
+FROM (
+    SELECT TOP 45 sales_rep_id
+    FROM dim_sales_reps
+    ORDER BY sales_rep_id
+) r;
+
+DECLARE @CustCount INT = (SELECT COUNT(*) FROM #cust_idx);
+DECLARE @RepCount  INT = (SELECT COUNT(*) FROM #rep_idx);
+
 INSERT INTO fact_sales_orders (customer_id, sales_rep_id, order_date, order_date_id, shipping_date, status)
 SELECT
-    ((s.n - 1) % 450) + 1,
-    ((s.n - 1) % 45) + 1,
+    ci.customer_id,
+    ri.sales_rep_id,
     s.order_date,
     s.order_date,
     DATEADD(DAY, s.ship_lag, s.order_date),
@@ -251,6 +313,8 @@ SELECT
 FROM (
     SELECT TOP (@NumOrders)
         ROW_NUMBER() OVER (ORDER BY (SELECT NULL))                    AS n,
+        (ABS(CHECKSUM(NEWID())) % @CustCount) + 1                     AS cust_idx,
+        (ABS(CHECKSUM(NEWID())) % @RepCount) + 1                      AS rep_idx,
         DATEADD(DAY, ABS(CHECKSUM(NEWID())) % @SpanDays, @OrderStart) AS order_date,
         CASE ABS(CHECKSUM(NEWID())) % 10
             WHEN 0 THEN ABS(CHECKSUM(NEWID())) % 16 + 15
@@ -272,7 +336,12 @@ FROM (
             ELSE         'Completed'
         END                                                           AS status
     FROM sys.objects a CROSS JOIN sys.objects b CROSS JOIN sys.objects c
-) s;
+) s
+JOIN #cust_idx ci ON ci.idx = s.cust_idx
+JOIN #rep_idx  ri ON ri.idx = s.rep_idx;
+
+DROP TABLE #cust_idx;
+DROP TABLE #rep_idx;
 GO
 
 
