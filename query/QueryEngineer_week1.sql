@@ -61,9 +61,9 @@ SELECT
     product_id,
     product_name
 FROM dbo.dim_products
-WHERE product_name LIKE '%Pro%'
-   OR product_name LIKE '%Plus%'
-   OR product_name LIKE '%Max%';
+WHERE product_name LIKE '%Pro'
+   OR product_name LIKE '%Plus'
+   OR product_name LIKE '%Max';
 
 --------------------------------------------------
 
