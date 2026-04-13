@@ -9,6 +9,7 @@ DROP VIEW IF EXISTS vw_summary_product_returns;
 DROP VIEW IF EXISTS vw_summary_quota_monthly;
 DROP VIEW IF EXISTS vw_summary_returns;
 DROP VIEW IF EXISTS vw_summary_sales_category;
+DROP VIEW IF EXISTS vw_summary_customer_returns;
 GO
 
 CREATE VIEW vw_summary_sales AS
@@ -54,6 +55,19 @@ SELECT
     SUM(net_price) * 1.0 / NULLIF(COUNT(DISTINCT order_id),0) AS avg_order_value
 FROM vw_base_sales
 GROUP BY customer_id, customer_name;
+GO
+
+CREATE VIEW vw_summary_customer_returns AS
+SELECT 
+    bs.customer_id,
+    SUM(bs.quantity) AS total_units_sold,
+    SUM(br.returned_quantity) AS total_units_returned,
+    SUM(br.returned_quantity) * 100.0 
+        / NULLIF(SUM(bs.quantity),0) AS return_rate_pct
+FROM vw_base_sales bs
+LEFT JOIN vw_base_returns br 
+    ON bs.order_id = br.order_id
+GROUP BY bs.customer_id;
 GO
 
 CREATE VIEW vw_summary_product AS
