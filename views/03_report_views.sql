@@ -1,3 +1,6 @@
+USE NordaTrade;
+GO
+
 DROP VIEW IF EXISTS dbo.vw_sales_executive_summary;
 DROP VIEW IF EXISTS dbo.vw_customer_360;
 DROP VIEW IF EXISTS dbo.vw_product_performance;
