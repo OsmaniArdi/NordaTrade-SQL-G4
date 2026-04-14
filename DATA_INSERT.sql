@@ -191,13 +191,12 @@ SELECT TOP (@NumSalesReps)
 INTO #rep_stage
 FROM sys.objects a CROSS JOIN sys.objects b;
 
-INSERT INTO dim_sales_reps (employee_code, full_name, region_id, hire_date, quota_target)
+INSERT INTO dim_sales_reps (employee_code, full_name, region_id, hire_date)
 SELECT
     'REP' + RIGHT('000000' + CAST(n AS VARCHAR(10)), 6)              AS employee_code,
     'Representative ' + CAST(n AS VARCHAR(10))                       AS full_name,
     r.region_id                                                      AS region_id,
-    DATEADD(DAY, ABS(CHECKSUM(NEWID())) % 1095, '2022-01-01')        AS hire_date,
-    CAST(((ABS(CHECKSUM(NEWID())) % 41) + 30) * 10000 AS DECIMAL(12,2)) AS quota_target
+    DATEADD(DAY, ABS(CHECKSUM(NEWID())) % 1095, '2022-01-01')        AS hire_date
 FROM #rep_stage
 CROSS APPLY (
     SELECT TOP 1 region_id
