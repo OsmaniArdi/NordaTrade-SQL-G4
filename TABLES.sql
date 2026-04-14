@@ -54,7 +54,6 @@ CREATE TABLE dim_sales_reps (
     full_name NVARCHAR(100) NOT NULL,
     region_id INT NOT NULL,
     hire_date DATE NOT NULL,
-    quota_target DECIMAL(12,2) DEFAULT 0,
     created_at DATETIME DEFAULT GETDATE(),
 
     CONSTRAINT fk_rep_region
