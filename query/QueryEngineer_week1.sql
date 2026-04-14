@@ -24,11 +24,26 @@ SELECT
     o.order_id,
     c.customer_name,
     o.order_date,
-    o.status
+    o.status,
+    SUM(li.quantity * li.unit_price) AS total_order_value
 FROM dbo.fact_sales_orders o
 JOIN dbo.dim_customers c 
     ON o.customer_id = c.customer_id
-WHERE o.status IN ('Pending', 'Partially Delivered');
+JOIN dbo.fact_order_line_items li 
+    ON o.order_id = li.order_id
+WHERE o.status IN ('Pending', 'Partially Delivered')
+  AND DATEPART(QUARTER, o.order_date) = 3
+  AND YEAR(o.order_date) = (
+      SELECT MAX(YEAR(i.order_date))
+      FROM dbo.fact_sales_orders i
+      WHERE DATEPART(QUARTER, i.order_date) = 3
+        AND i.status IN ('Pending', 'Partially Delivered')
+  )
+GROUP BY 
+    o.order_id,
+    c.customer_name,
+    o.order_date,
+    o.status;
 
 --------------------------------------------------
 
@@ -38,9 +53,9 @@ SELECT
     product_name,
     unit_cost,
     list_price,
-    (list_price - unit_cost) * 1.0 / list_price * 100 AS margin_percent
+    ROUND((list_price - unit_cost) * 1.0 / NULLIF(list_price, 0) * 100, 1) AS margin_percent 
 FROM dbo.dim_products
-WHERE list_price > unit_cost * 3
+WHERE (list_price - unit_cost) * 1.0 / NULLIF(list_price, 0) > 0.3
 ORDER BY margin_percent DESC;
 
 --------------------------------------------------
@@ -52,6 +67,7 @@ SELECT
 FROM dbo.dim_sales_reps r
 LEFT JOIN dbo.rep_customer_assignments rc
     ON r.sales_rep_id = rc.sales_rep_id
+   AND (rc.end_date IS NULL OR rc.end_date >= DATEADD(MONTH, -6, GETDATE()))
 WHERE rc.customer_id IS NULL;
 
 --------------------------------------------------
@@ -61,19 +77,24 @@ SELECT
     product_id,
     product_name
 FROM dbo.dim_products
-WHERE product_name LIKE '%Pro'
-   OR product_name LIKE '%Plus'
-   OR product_name LIKE '%Max';
+WHERE product_name LIKE '%Pro%'
+   OR product_name LIKE '%Plus%'
+   OR product_name LIKE '%Max%';
 
 --------------------------------------------------
 
 -- Q6: Delayed orders
 SELECT 
-    order_id,
-    order_date,
-    shipping_date
-FROM dbo.fact_sales_orders
-WHERE DATEDIFF(day, order_date, shipping_date) > 14;
+    o.order_id,
+    o.order_date,
+    o.shipping_date
+FROM dbo.fact_sales_orders o
+JOIN dbo.dim_customers c 
+    ON o.customer_id = c.customer_id
+JOIN dbo.dim_regions r 
+    ON c.region_id = r.region_id
+WHERE DATEDIFF(day, o.order_date, o.shipping_date) > 14
+  AND r.country = 'Germany';
 --------------------------------------------------
 --------------------------------------------------
 
@@ -155,10 +176,10 @@ GROUP BY c.region_id, d.month;
 -- KPI 5: Return Rate by Product
 SELECT 
     p.product_name,
-    SUM(r.quantity) * 1.0 / NULLIF(SUM(li.quantity), 0) * 100 AS return_rate
-FROM dbo.fact_returns r
-JOIN dbo.fact_order_line_items li 
-    ON r.line_item_id = li.line_item_id
+    SUM(ISNULL(r.quantity, 0)) * 1.0 / NULLIF(SUM(li.quantity), 0) * 100 AS return_rate
+FROM dbo.fact_order_line_items li
+LEFT JOIN dbo.fact_returns r 
+    ON li.line_item_id = r.line_item_id
 JOIN dbo.dim_products p 
     ON li.product_id = p.product_id
 GROUP BY p.product_name;
@@ -174,6 +195,7 @@ JOIN dbo.fact_order_line_items li
     ON o.order_id = li.order_id
 JOIN dbo.fact_quotas q 
     ON o.sales_rep_id = q.sales_rep_id
+   AND o.order_date BETWEEN q.period_start AND q.period_end
 JOIN dbo.dim_sales_reps r 
     ON o.sales_rep_id = r.sales_rep_id
 GROUP BY r.sales_rep_id;
@@ -213,15 +235,16 @@ GO
 SELECT 
     p.category_id,
     AVG((li.unit_price - p.unit_cost) * 1.0 / NULLIF(li.unit_price, 0)) * 100 AS avg_margin,
-    SUM(r.quantity) * 1.0 / NULLIF(SUM(li.quantity), 0) * 100 AS return_rate
+    SUM(ISNULL(r.quantity, 0)) * 1.0 / NULLIF(SUM(li.quantity), 0) * 100 AS return_rate
 FROM dbo.fact_order_line_items li
 JOIN dbo.dim_products p 
     ON li.product_id = p.product_id
-JOIN dbo.fact_returns r 
+LEFT JOIN dbo.fact_returns r 
     ON li.line_item_id = r.line_item_id
 GROUP BY p.category_id
-HAVING AVG((li.unit_price - p.unit_cost) * 1.0 / NULLIF(li.unit_price, 0)) < 0.25
-    OR SUM(r.quantity) * 1.0 / NULLIF(SUM(li.quantity), 0) > 0.10;
+HAVING 
+    AVG((li.unit_price - p.unit_cost) * 1.0 / NULLIF(li.unit_price, 0)) * 100 < 25
+    OR SUM(ISNULL(r.quantity, 0)) * 1.0 / NULLIF(SUM(li.quantity), 0) * 100 > 10;
 
 --------------------------------------------------
 
@@ -235,11 +258,14 @@ JOIN dbo.fact_order_line_items li
     ON o.order_id = li.order_id
 JOIN dbo.fact_quotas q 
     ON o.sales_rep_id = q.sales_rep_id
+   AND o.order_date BETWEEN q.period_start AND q.period_end
 JOIN dbo.dim_sales_reps r 
     ON o.sales_rep_id = r.sales_rep_id
 GROUP BY r.sales_rep_id
-HAVING SUM(li.quantity * li.unit_price * (1 - li.discount)) >= 1500
-   AND SUM(li.quantity * li.unit_price * (1 - li.discount)) < 0.8 * SUM(q.quota_amount);
+HAVING 
+    SUM(li.quantity * li.unit_price * (1 - li.discount)) >= 1500
+    AND SUM(li.quantity * li.unit_price * (1 - li.discount)) 
+        < 0.8 * SUM(q.quota_amount);
 
 --------------------------------------------------
 
@@ -254,7 +280,8 @@ JOIN dbo.fact_order_line_items li
 JOIN dbo.dim_customers c 
     ON o.customer_id = c.customer_id
 GROUP BY c.customer_id
-HAVING  AVG(li.quantity * li.unit_price) < 500;
+HAVING  COUNT(DISTINCT o.order_id) > 20
+  AND  AVG(li.quantity * li.unit_price) < 1000;
 
 
 
