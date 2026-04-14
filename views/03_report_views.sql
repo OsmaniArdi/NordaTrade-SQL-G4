@@ -22,8 +22,9 @@ SELECT
     SUM(q.quota_amount) AS total_quota,
     SUM(s.total_revenue) * 100.0 / NULLIF(SUM(q.quota_amount),0) AS quota_attainment_pct
 FROM vw_summary_sales s
-LEFT JOIN fact_quotas q 
-    ON s.month BETWEEN q.period_start AND q.period_end
+LEFT JOIN vw_summary_quota_quarter q
+    ON YEAR(s.month) = q.year
+    AND DATEPART(QUARTER, s.month) = q.quarter
 GROUP BY 
     s.country,
     s.region_name,
