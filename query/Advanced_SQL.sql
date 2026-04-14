@@ -192,3 +192,65 @@ WHERE NOT EXISTS (
         HAVING SUM(li2.net_price) > 1000000
     )
 );
+
+
+-- ------------------------------------------------------------------------
+-- TEAM QUERY
+-- ------------------------------------------------------------------------
+
+
+-- ----------------------------------------------------------------------------
+-- Top 3 Customers per Country
+
+WITH customer_revenue AS (
+    SELECT
+        c.customer_id,
+        c.customer_name,
+        r.country,
+        SUM(li.net_price) AS revenue
+    FROM dim_customers c
+    JOIN dim_regions r ON c.region_id = r.region_id
+    JOIN fact_sales_orders o ON c.customer_id = o.customer_id
+    JOIN fact_order_line_items li ON o.order_id = li.order_id
+    GROUP BY c.customer_id, c.customer_name, r.country
+)
+SELECT
+    customer_id,
+    customer_name,
+    country,
+    revenue
+FROM (
+    SELECT *,
+        ROW_NUMBER() OVER (PARTITION BY country ORDER BY revenue DESC) AS rn
+    FROM customer_revenue
+) x
+WHERE rn <= 3
+ORDER BY country, revenue DESC;
+
+
+-- ----------------------------------------------------------------------------
+-- Monthly Revenue Trend by Country
+
+WITH monthly_revenue AS (
+    SELECT
+        r.country,
+        d.year,
+        d.month,
+        SUM(li.net_price) AS revenue
+    FROM fact_sales_orders o
+    JOIN dim_customers c ON o.customer_id = c.customer_id
+    JOIN dim_regions r ON c.region_id = r.region_id
+    JOIN dim_date d ON o.order_date = d.date_id
+    JOIN fact_order_line_items li ON o.order_id = li.order_id
+    GROUP BY r.country, d.year, d.month
+)
+SELECT
+    country,
+    year,
+    month,
+    revenue,
+    LAG(revenue) OVER (PARTITION BY country ORDER BY year, month) AS prev_revenue,
+    revenue - LAG(revenue) OVER (PARTITION BY country ORDER BY year, month) AS diff
+FROM monthly_revenue
+ORDER BY country, year, month;
+
