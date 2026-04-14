@@ -6,7 +6,7 @@ DROP VIEW IF EXISTS vw_summary_customer;
 DROP VIEW IF EXISTS vw_summary_product;
 DROP VIEW IF EXISTS vw_summary_rep_period;
 DROP VIEW IF EXISTS vw_summary_product_returns;
-DROP VIEW IF EXISTS vw_summary_quota_monthly;
+DROP VIEW IF EXISTS vw_summary_quota_quarter;
 DROP VIEW IF EXISTS vw_summary_returns;
 DROP VIEW IF EXISTS vw_summary_sales_category;
 DROP VIEW IF EXISTS vw_summary_customer_returns;
@@ -73,14 +73,20 @@ GO
 CREATE VIEW vw_summary_product AS
 SELECT 
     product_id,
+    sku, 
     product_name,
     category_name,
     SUM(quantity) AS units_sold,
     SUM(net_price) AS revenue,
     SUM(total_cost) AS cost,
-    (SUM(net_price) - SUM(total_cost)) * 100.0 / NULLIF(SUM(net_price),0) AS margin_pct
-FROM vw_base_sales
-GROUP BY product_id, product_name, category_name;
+    (SUM(net_price) - SUM(total_cost)) * 100.0 
+        / NULLIF(SUM(net_price),0) AS margin_pct
+FROM vw_base_sales 
+GROUP BY 
+    product_id,
+    sku,
+    product_name,
+    category_name;
 GO
 
 CREATE VIEW vw_summary_product_returns AS
@@ -135,10 +141,15 @@ GROUP BY
     d.quarter;
 GO
 
-CREATE VIEW vw_summary_quota_monthly AS
+CREATE VIEW vw_summary_quota_quarter AS
 SELECT 
     sales_rep_id,
-    DATETRUNC(MONTH, period_start) AS month,
-    quota_amount
-FROM fact_quotas;
+    YEAR(period_start) AS year,
+    DATEPART(QUARTER, period_start) AS quarter,
+    SUM(quota_amount) AS quota_amount
+FROM fact_quotas
+GROUP BY 
+    sales_rep_id,
+    YEAR(period_start),
+    DATEPART(QUARTER, period_start);
 GO
