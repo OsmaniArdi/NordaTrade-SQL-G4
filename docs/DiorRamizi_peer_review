@@ -1,3 +1,4 @@
+-- For Suhejla Hoxha
 Starting with the Top Customers query, this is definitely one of the stronger ones. 
 The calculation of lifetime value using quantity, unit price, and discount shows a good understanding of how revenue should actually be calculated.
 It’s not just a basic sum, but something that reflects real business logic. 
@@ -10,6 +11,8 @@ This ensures that customers who have never placed an order are not missed, which
 The logic is clean, and the use of LEFT JOIN is appropriate here. 
 This query reflects a good understanding of how to work with missing data and time-based conditions.
 
+
+-- For Ardi Osmani
 For the Products with No Sales query, the approach is simple but effective. 
 Using a LEFT JOIN and checking for NULL is the correct and standard way to solve this type of problem. 
 There’s no overcomplication, which is actually a positive here. The query is easy to read and does exactly what is expected, making it reliable and easy to maintain.
