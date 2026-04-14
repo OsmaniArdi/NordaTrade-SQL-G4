@@ -1,0 +1,48 @@
+Overview
+I worked as the Data Modeler in this project, with a primary focus on designing the relational structure and building reliable seed/data insert scripts. My role was to make sure the database schema supports business requirements and that the inserted data is realistic, consistent, and ready for analytics and reporting.
+
+Data Modeling Contribution
+In the modeling phase, I focused on creating a clean and scalable structure:
+
+- Defined core entities and relationships based on project requirements.
+- Established primary keys and foreign keys to enforce referential integrity.
+- Designed normalized table structures to reduce redundancy and improve consistency.
+- Mapped business concepts (customers, products, orders, sales reps, returns, quotas, regions) into relational tables.
+- Ensured compatibility between transactional tables and later analytical/reporting needs.
+
+Seeding and Data Insert Responsibilities
+My main responsibility was preparing and managing seed scripts for initial and testing datasets:
+
+- Created insert scripts for dimension and transactional tables in a logical load order.
+- Populated data with realistic values to simulate real business behavior.
+- Ensured parent-child inserts follow foreign key dependencies to avoid constraint errors.
+- Added enough data variety (countries, categories, customer tiers, statuses, dates) to support complex SQL queries.
+- Balanced sample volume to enable KPI calculations, joins, and advanced analytical queries.
+
+Data Quality and Validation
+To ensure the dataset was stable and usable, I performed consistency checks:
+
+- Verified foreign key links after inserts.
+- Checked for duplicates in key business entities where uniqueness was expected.
+- Reviewed nullability and required fields to avoid incomplete records.
+- Validated date ranges and numeric values for business logic correctness.
+- Re-tested insert scripts after schema adjustments to keep data aligned with model updates.
+
+Impact on Project
+The data modeling and seeding work provided the foundation for later phases:
+
+- Enabled query development and KPI calculations with complete and connected datasets.
+- Reduced debugging time in analytical phases by preventing data integrity issues early.
+- Supported team members by delivering a dependable dataset for business queries and reporting.
+
+Key Improvements
+- Improved insert sequencing to fully respect relational dependencies.
+- Refined sample data coverage to better support edge cases in SQL tasks.
+- Standardized seed structure for easier maintenance and repeatable setup.
+
+Peer Review
+- Query reviewed - Month-over-Month Revenue:
+This query is well structured and correctly uses `LAG` for trend comparison by country. A small improvement would be adding `NULLIF` in the percentage calculation to avoid division-by-zero when previous month revenue is 0.
+
+- Query reviewed - Q2 Pending/Partially Delivered Orders:
+This query answers the business question clearly and applies good filtering for status and latest Q3. It can be improved by using `li.net_price` (or discounted value) instead of `quantity * unit_price` so totals stay consistent with net revenue logic used in the rest of the project.
