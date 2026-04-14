@@ -1,0 +1,36 @@
+Overview
+I worked as the Query Engineer in this project, focusing on writing SQL queries that actually answer real business questions. My main responsibility was to take the data model and turn it into something useful through queries, KPIs, and analysis. I worked across Phase 2 (business queries), Phase 3 (KPIs), and Phase 4 (advanced joins and reporting).
+Phase 2 – Business Queries
+In this phase, I focused on answering practical business questions.
+
+- Identified high-value customers in Germany based on tier and credit limit.
+- Built a query for pending and partially delivered orders, including total order value and filtering for the latest Q3.
+- Found high-margin products using proper margin calculation instead of simple price comparison.
+- Detected sales reps with no assignments in the last 6 months using LEFT JOIN and time logic.
+- Filtered products using keywords like Pro, Plus, and Max using correct LIKE patterns.
+- Identified delayed orders using DATEDIFF and added country-level filtering.
+Phase 3 – KPIs
+In this phase, I built key performance indicators to measure business performance:
+
+- Gross Revenue and Net Revenue to track sales.
+- Gross Margin % to understand profitability.
+- Average Order Value to analyze customer spending.
+- Return Rate using LEFT JOIN and ISNULL to include products with no returns.
+- Quota Attainment %, where I fixed a Cartesian product issue by adding a date condition.
+- Customer Order Frequency to measure engagement.
+- Top Products by Revenue for ranking performance.
+Phase 4 – Advanced Queries
+This phase was about combining everything into more complete reporting queries:
+
+- Full Order Summary combining all major tables.
+- Orphan detection to find customers with no orders.
+- Rep-customer mismatch to detect incorrect assignments.
+- Revenue by geography using grouped data.
+- Product cost vs selling price to calculate real margin.
+- Unordered active products in the last 12 months.
+Key Improvements & Fixes
+- Fixed quota calculation by preventing Cartesian joins.
+- Corrected return rate logic using LEFT JOIN.
+- Improved margin calculation to reflect real profitability.
+- Fixed LIKE patterns to correctly match product names.
+- Adjusted HAVING queries to properly filter aggregated data.
