@@ -1,0 +1,155 @@
+-- Full Order Summary
+SELECT
+    o.order_id,
+    o.order_date,
+    o.shipping_date,
+    o.status,
+    c.customer_id,
+    c.customer_code,
+    c.customer_name,
+    c.tier AS customer_tier,
+    r.region_id,
+    r.country,
+    r.region_name,
+    r.territory,
+    sr.sales_rep_id,
+    sr.employee_code,
+    sr.full_name AS sales_rep_name,
+    li.line_item_id,
+    li.product_id,
+    p.sku,
+    p.product_name,
+    p.category_id,
+    li.quantity,
+    li.unit_price,
+    li.discount,
+    li.total_price,
+    li.discount_amount,
+    li.net_price
+FROM dbo.fact_sales_orders o
+JOIN dbo.dim_customers c 
+    ON o.customer_id = c.customer_id
+JOIN dbo.dim_regions r 
+    ON c.region_id = r.region_id
+JOIN dbo.dim_sales_reps sr 
+    ON o.sales_rep_id = sr.sales_rep_id
+JOIN dbo.fact_order_line_items li 
+    ON o.order_id = li.order_id
+JOIN dbo.dim_products p 
+    ON li.product_id = p.product_id;
+
+--------------------------------------------------
+
+-- Orphan Detection (customers with no orders)
+SELECT
+    c.customer_id,
+    c.customer_code,
+    c.customer_name,
+    c.tier,
+    c.credit_limit,
+    r.country,
+    r.region_name
+FROM dbo.dim_customers c
+LEFT JOIN dbo.fact_sales_orders o 
+    ON c.customer_id = o.customer_id
+LEFT JOIN dbo.dim_regions r 
+    ON c.region_id = r.region_id
+WHERE o.order_id IS NULL
+ORDER BY c.customer_id;
+
+--------------------------------------------------
+
+-- Rep-Customer Mismatch
+SELECT
+    o.order_id,
+    o.order_date,
+    c.customer_id,
+    c.customer_name,
+    o.sales_rep_id AS order_sales_rep_id,
+    osr.full_name AS order_sales_rep_name,
+    a.sales_rep_id AS assigned_sales_rep_id,
+    asr.full_name AS assigned_sales_rep_name
+FROM dbo.fact_sales_orders o
+JOIN dbo.dim_customers c 
+    ON o.customer_id = c.customer_id
+LEFT JOIN dbo.rep_customer_assignments a
+    ON o.customer_id = a.customer_id
+   AND o.order_date >= a.start_date
+   AND (a.end_date IS NULL OR o.order_date <= a.end_date)
+LEFT JOIN dbo.dim_sales_reps osr 
+    ON o.sales_rep_id = osr.sales_rep_id
+LEFT JOIN dbo.dim_sales_reps asr 
+    ON a.sales_rep_id = asr.sales_rep_id
+WHERE a.sales_rep_id IS NULL
+   OR o.sales_rep_id <> a.sales_rep_id
+ORDER BY o.order_id;
+
+--------------------------------------------------
+
+-- Revenue by Geography
+SELECT
+    r.country,
+    r.region_name,
+    r.territory,
+    SUM(li.net_price) AS net_revenue
+FROM dbo.fact_sales_orders o
+JOIN dbo.dim_customers c 
+    ON o.customer_id = c.customer_id
+JOIN dbo.dim_regions r 
+    ON c.region_id = r.region_id
+JOIN dbo.fact_order_line_items li 
+    ON o.order_id = li.order_id
+GROUP BY 
+    r.country,
+    r.region_name,
+    r.territory
+ORDER BY 
+    r.country,
+    r.region_name,
+    r.territory;
+
+--------------------------------------------------
+
+-- Product Cost vs Actual Sell Price
+SELECT
+    li.line_item_id,
+    li.order_id,
+    li.product_id,
+    p.product_name,
+    li.quantity,
+    p.unit_cost,
+    li.unit_price,
+    li.discount,
+    li.net_price,
+    li.quantity * p.unit_cost AS total_cost,
+    li.net_price - (li.quantity * p.unit_cost) AS realized_margin_value,
+    (li.net_price - (li.quantity * p.unit_cost)) * 1.0 / NULLIF(li.net_price, 0) AS realized_margin_pct
+FROM dbo.fact_order_line_items li
+JOIN dbo.dim_products p 
+    ON li.product_id = p.product_id
+ORDER BY li.line_item_id;
+
+--------------------------------------------------
+
+-- Unordered Active Products in Last 12 Months
+SELECT
+    p.product_id,
+    p.sku,
+    p.product_name,
+    p.category_id,
+    p.is_active
+FROM dbo.dim_products p
+LEFT JOIN dbo.fact_order_line_items li 
+    ON p.product_id = li.product_id
+LEFT JOIN dbo.fact_sales_orders o 
+    ON li.order_id = o.order_id
+   AND o.order_date >= DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))
+WHERE p.is_active = 1
+GROUP BY
+    p.product_id,
+    p.sku,
+    p.product_name,
+    p.category_id,
+    p.is_active
+HAVING COUNT(o.order_id) = 0
+ORDER BY p.product_id;
