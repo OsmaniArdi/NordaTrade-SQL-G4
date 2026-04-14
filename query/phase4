@@ -186,3 +186,66 @@ GROUP BY
     r.country,
     r.region_name
 ORDER BY total_revenue DESC;
+
+
+-- -------------------------------------------
+-- TEAM QUERY
+-- ---------------------------------------------
+
+
+-- Sales Rep Performance (trailing 12 months) @OsmaniArdi
+SELECT
+    sr.sales_rep_id,
+    sr.employee_code,
+    sr.full_name AS sales_rep_name,
+    COUNT(DISTINCT o.order_id) AS order_count,
+    COUNT(DISTINCT c.customer_id) AS distinct_customers,
+    SUM(li.net_price) AS net_revenue,
+    SUM(li.net_price) * 1.0 / NULLIF(COUNT(DISTINCT o.order_id), 0) AS avg_order_value
+FROM dbo.fact_sales_orders o
+JOIN dbo.dim_sales_reps sr
+    ON o.sales_rep_id = sr.sales_rep_id
+JOIN dbo.dim_customers c
+    ON o.customer_id = c.customer_id
+JOIN dbo.fact_order_line_items li
+    ON o.order_id = li.order_id
+WHERE o.order_date >= DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))
+GROUP BY
+    sr.sales_rep_id,
+    sr.employee_code,
+    sr.full_name
+ORDER BY net_revenue DESC;
+
+
+
+
+-- Top Customers by Net Revenue (trailing 12 months) @OsmaniArdi
+SELECT TOP (50)
+    c.customer_id,
+    c.customer_code,
+    c.customer_name,
+    c.tier AS customer_tier,
+    c.credit_limit,
+    r.country,
+    r.region_name,
+    r.territory,
+    COUNT(DISTINCT o.order_id) AS order_count,
+    SUM(li.net_price) AS net_revenue
+FROM dbo.fact_sales_orders o
+JOIN dbo.dim_customers c
+    ON o.customer_id = c.customer_id
+JOIN dbo.dim_regions r
+    ON c.region_id = r.region_id
+JOIN dbo.fact_order_line_items li
+    ON o.order_id = li.order_id
+WHERE o.order_date >= DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))
+GROUP BY
+    c.customer_id,
+    c.customer_code,
+    c.customer_name,
+    c.tier,
+    c.credit_limit,
+    r.country,
+    r.region_name,
+    r.territory
+ORDER BY net_revenue DESC;
