@@ -100,7 +100,7 @@ GO
 CREATE VIEW vw_product_performance AS
 SELECT 
     sp.product_id,
-    p.sku,
+    sp.sku, 
     sp.product_name,
     sp.category_name,
     sp.units_sold,
@@ -115,9 +115,7 @@ SELECT
 
 FROM vw_summary_product sp
 LEFT JOIN vw_summary_product_returns pr 
-    ON sp.product_id = pr.product_id
-JOIN dim_products p 
-    ON sp.product_id = p.product_id;
+    ON sp.product_id = pr.product_id;
 GO
 
 -- Rep Scorecard
@@ -152,9 +150,10 @@ SELECT
     ) AS rank_in_region
 FROM vw_summary_rep_period r
 CROSS JOIN current_period cp
-LEFT JOIN vw_summary_quota_monthly q
+LEFT JOIN vw_summary_quota_quarter q
     ON r.sales_rep_id = q.sales_rep_id
-	AND DATETRUNC(MONTH, DATEFROMPARTS(r.year, r.quarter * 3, 1)) = q.month;
+    AND r.year = q.year
+    AND r.quarter = q.quarter
 GO
 
 -- Monthly Trend
