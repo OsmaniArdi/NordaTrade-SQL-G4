@@ -153,3 +153,36 @@ GROUP BY
     p.is_active
 HAVING COUNT(o.order_id) = 0
 ORDER BY p.product_id;
+----------------------------------------------------
+-- Total Revenue by Customer
+SELECT
+    c.customer_id,
+    c.customer_name,
+    SUM(li.net_price) AS total_revenue
+FROM dbo.fact_sales_orders o
+JOIN dbo.dim_customers c 
+    ON o.customer_id = c.customer_id
+JOIN dbo.fact_order_line_items li 
+    ON o.order_id = li.order_id
+GROUP BY 
+    c.customer_id,
+    c.customer_name
+ORDER BY total_revenue DESC;
+
+-------------------------------------------------
+-- Revenue by Region
+SELECT
+    r.country,
+    r.region_name,
+    SUM(li.net_price) AS total_revenue
+FROM dbo.fact_sales_orders o
+JOIN dbo.dim_customers c 
+    ON o.customer_id = c.customer_id
+JOIN dbo.dim_regions r 
+    ON c.region_id = r.region_id
+JOIN dbo.fact_order_line_items li 
+    ON o.order_id = li.order_id
+GROUP BY 
+    r.country,
+    r.region_name
+ORDER BY total_revenue DESC;
