@@ -17,6 +17,7 @@ SELECT
     rep.sales_rep_id,
     rep.full_name AS sales_rep_name,
     p.product_id,
+	p.sku,
     p.product_name,
     cat.category_name,
     li.quantity,
