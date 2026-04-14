@@ -1,0 +1,32 @@
+Phase 5 Advanced SQL
+This phase implements advanced analytical SQL queries to transform transactional data into meaningful business insights and support decision-making processes.
+- The Customer RFM Segmentation query calculates Recency, Frequency, and Monetary values for each customer, assigns scores based on defined thresholds, and classifies customers into segments such as Champions, Loyal, At Risk, and Lost.
+- The Month-over-Month Revenue query aggregates revenue by country on a monthly basis and uses window functions to calculate previous month revenue, absolute change, and percentage growth for trend analysis.
+- The Running Total by Quarter query computes order-level revenue and calculates a cumulative running total within each region and quarter to track performance over time.
+- The Rank Sales Reps Within Region query evaluates sales representatives by calculating revenue, quota attainment, and ranking them within their region for the latest quarter.
+- The Top Customer per Country query identifies the highest-revenue customer in each country for the most recent year using ranking functions.
+- The Products Never Ordered in High-Revenue Regions query identifies products that have not been sold in regions with high revenue, helping uncover gaps and potential opportunities for expansion.
+
+Phase 6 The Analytical Surface
+This implementation follows a three-tier SAP BW-style architecture, organizing data into base views (DSO layer), summary views (InfoCube/CompositeProvider layer), and final report views (BEx Query layer) to enable scalable and reusable analytics.
+Tier 1 - Base Views - DataStore Objects DSO
+- The vw_base_sales and vw_base_returns views create a clean, detailed foundation by combining transactional and dimensional data without aggregation.
+Tier 2 - Summary Views - InfoCubes / CompositeProviders
+- The vw_summary_sales and vw_summary_sales_category views aggregate revenue, cost, and volume metrics by time, region, and category.
+- The vw_summary_customer and vw_summary_customer_returns views provide customer-level insights, including lifetime value, order behavior, and return rates.
+- The vw_summary_product and vw_summary_product_returns views analyze product performance and return behavior at SKU level.
+- The vw_summary_returns view summarizes return activity by category, country, reason, and time period.
+- The vw_summary_rep_period and vw_summary_quota_quarter views align sales performance with quarterly quotas for accurate comparison.
+Tier 3 – Report Views - BEx Query Level
+- The vw_sales_executive_summary view delivers high-level KPIs such as revenue, margin, order count, and quota attainment.
+- The vw_customer_360 view provides a complete customer profile with RFM segmentation and assigned sales representative.
+- The vw_product_performance view shows key product metrics and ranking within categories.
+- The vw_rep_performance_scorecard view evaluates sales reps based on revenue, quotas, and rankings.
+- The vw_monthly_trend view analyzes revenue trends over time with month-over-month changes.
+- The vw_returns_analysis view provides insights into return rates, reasons, and financial impact.
+
+Peer Review
+- Low margin OR high return categories
+This query is well designed for identifying underperforming product categories by combining margin and return rate analysis. It provides useful business insight, but the use of an inner join may exclude categories with no returns.
+- Reps with revenue but low quota attainment
+As for the second query effectively highlights sales representatives who generate revenue but fail to meet quota expectations. However, the absence of time-based filtering for quotas can lead to misleading comparisons.
