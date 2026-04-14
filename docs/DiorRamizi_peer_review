@@ -1,0 +1,20 @@
+Starting with the Top Customers query, this is definitely one of the stronger ones. 
+The calculation of lifetime value using quantity, unit price, and discount shows a good understanding of how revenue should actually be calculated.
+It’s not just a basic sum, but something that reflects real business logic. 
+The joins are straightforward and correct, and the use of TOP 5 combined with ordering makes the result immediately useful.
+Overall, this query is clear and does exactly what it’s supposed to do without unnecessary complexity.
+
+The Inactive Customers query is also well handled. 
+Using MAX(order_date) to determine the last activity is the right approach, and including the condition for NULL values shows attention to edge cases. 
+This ensures that customers who have never placed an order are not missed, which is important in this type of analysis. 
+The logic is clean, and the use of LEFT JOIN is appropriate here. 
+This query reflects a good understanding of how to work with missing data and time-based conditions.
+
+For the Products with No Sales query, the approach is simple but effective. 
+Using a LEFT JOIN and checking for NULL is the correct and standard way to solve this type of problem. 
+There’s no overcomplication, which is actually a positive here. The query is easy to read and does exactly what is expected, making it reliable and easy to maintain.
+
+The Top 5 Sales Reps query follows a similar pattern to the Top Customers query, which is a good thing.
+Reusing the same revenue calculation logic keeps everything consistent across the analysis. 
+The grouping and ordering are correct, and the result is clear and meaningful.
+This kind of consistency across queries shows a good level of organization and understanding.
