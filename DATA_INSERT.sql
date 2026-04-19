@@ -164,7 +164,7 @@ SELECT
 
     CASE
         WHEN s.n <= 40 THEN CAST(uc.unit_cost * (3.5 + (ABS(CHECKSUM(NEWID())) % 16) * 0.1) AS DECIMAL(10,2))
-        ELSE                CAST(uc.unit_cost * (1.5 + (ABS(CHECKSUM(NEWID())) % 14) * 0.1) AS DECIMAL(10,2))
+        ELSE                CAST(uc.unit_cost * (1.05 + (ABS(CHECKSUM(NEWID())) % 3)  * 0.05) AS DECIMAL(10,2))
     END                                                              AS list_price
 
 FROM #prod_stage s
@@ -339,6 +339,24 @@ FROM (
 JOIN #cust_idx ci ON ci.idx = s.cust_idx
 JOIN #rep_idx  ri ON ri.idx = s.rep_idx;
 
+INSERT INTO fact_sales_orders
+    (customer_id, sales_rep_id, order_date, order_date_id, shipping_date, status)
+SELECT
+    c.customer_id,
+    ri.sales_rep_id,
+    DATEADD(DAY, nums.n * 14, '2023-01-01'),
+    DATEADD(DAY, nums.n * 14, '2023-01-01'),
+    DATEADD(DAY, nums.n * 14 + 5, '2023-01-01'),
+    'Completed'
+FROM (SELECT TOP 5 customer_id FROM dim_customers ORDER BY customer_id) c
+CROSS JOIN (
+    SELECT TOP 25 ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) - 1 AS n
+    FROM sys.objects
+) nums
+CROSS APPLY (
+    SELECT TOP 1 sales_rep_id FROM dim_sales_reps ORDER BY NEWID()
+) ri;
+
 DROP TABLE #cust_idx;
 DROP TABLE #rep_idx;
 GO
@@ -474,8 +492,8 @@ SELECT
     li.line_item_id,
     DATEADD(DAY, ABS(CHECKSUM(NEWID())) % 14 + 5, o.order_date),
     DATEADD(DAY, ABS(CHECKSUM(NEWID())) % 14 + 5, o.order_date),
-    1,
-    CAST(li.unit_price * (1 - li.discount) AS DECIMAL(12,2)),
+    li.quantity,
+    CAST(li.quantity * li.unit_price * (1 - li.discount) AS DECIMAL(12,2)),
     CASE ABS(CHECKSUM(NEWID())) % 3
         WHEN 0 THEN 'Damaged'
         WHEN 1 THEN 'Wrong Item'
