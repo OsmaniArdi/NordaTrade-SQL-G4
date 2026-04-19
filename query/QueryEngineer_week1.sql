@@ -243,7 +243,7 @@ LEFT JOIN dbo.fact_returns r
     ON li.line_item_id = r.line_item_id
 GROUP BY p.category_id
 HAVING 
-    AVG((li.unit_price - p.unit_cost) * 1.0 / NULLIF(li.unit_price, 0)) * 100 < 25
+    AVG((li.unit_price - p.unit_cost) * 1.0 / NULLIF(li.unit_price, 0)) * 100 < 50
     OR SUM(ISNULL(r.quantity, 0)) * 1.0 / NULLIF(SUM(li.quantity), 0) * 100 > 10;
 
 --------------------------------------------------
@@ -280,8 +280,8 @@ JOIN dbo.fact_order_line_items li
 JOIN dbo.dim_customers c 
     ON o.customer_id = c.customer_id
 GROUP BY c.customer_id
-HAVING  COUNT(DISTINCT o.order_id) > 20
-  AND  AVG(li.quantity * li.unit_price) < 1000;
+HAVING  COUNT(DISTINCT o.order_id) > 6
+  AND  AVG(li.quantity * li.unit_price) < 2200;
 
 
 
