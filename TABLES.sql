@@ -231,3 +231,28 @@ CREATE TABLE product_promotions (
         FOREIGN KEY (end_date_id)
         REFERENCES dim_date(date_id)
 );
+
+
+
+-- =========================
+-- INDEXES
+-- =========================
+
+CREATE INDEX IX_fso_customer_id  ON fact_sales_orders (customer_id);
+CREATE INDEX IX_fso_sales_rep_id ON fact_sales_orders (sales_rep_id);
+CREATE INDEX IX_fso_order_date   ON fact_sales_orders (order_date);
+CREATE INDEX IX_fso_status       ON fact_sales_orders (status);
+
+CREATE INDEX IX_foli_order_id   ON fact_order_line_items (order_id);
+CREATE INDEX IX_foli_product_id ON fact_order_line_items (product_id);
+
+CREATE INDEX IX_fr_line_item_id ON fact_returns (line_item_id);
+
+CREATE INDEX IX_fq_rep_id ON fact_quotas (sales_rep_id);
+
+CREATE INDEX IX_dc_region_id ON dim_customers (region_id);
+CREATE INDEX IX_dc_tier       ON dim_customers (tier);
+
+CREATE INDEX IX_dp_category_id ON dim_products (category_id);
+
+CREATE INDEX IX_rca_composite ON rep_customer_assignments (customer_id, sales_rep_id);
